@@ -1,0 +1,46 @@
+---
+#ansible-playbook lvmold.yaml --user shekhar -i hosts --limit "rke2servers" --extra-vars "partition_name=/dev/xvdf"
+---
+- name: playbook
+  hosts: rke2servers
+  become: true
+  tasks:
+          - name: task for VG
+            lvg:
+                    vg: data-vg
+                    pvs: "{{ partition_name }}"
+
+          - name: task for LV
+            lvol:
+                    vg: data-vg
+                    lv: "{{ item.first }}"
+                    size: "{{ item.second }}"
+            with_items:
+            - {first: rancher, second: 40G}
+            - {first: depot-1v, second: 10G}
+
+          - name: Formatting file system
+            shell: |
+               mkfs.xfs /dev/mapper/data--vg-rancher
+               mkfs.xfs /dev/mapper/data--vg-depot--1v
+          - name: Make directory
+            file:
+                    path: "{{item}}"
+                    state: directory
+            with_items:
+                    - "/var/lib/rancher"
+                    - "/depot"
+
+          - name: FSTAB entry
+            shell: echo "/dev/mapper/data--vg-rancher /var/lib/rancher xfs defaults 0 0" >> /etc/fstab
+            shell: echo "/dev/mapper/data--vg-depot--1v /depot xfs defaults 0 0" >> /etc/fstab
+
+          - name: Mount lv on rancher lib
+            mount:
+                    path: "{{ item.first }}"
+                    src: "{{ item.second }}"
+                    fstype: xfs
+                    state: mounted
+            with_items:
+                    - {first: "/var/lib/rancher", second: /dev/data-vg/rancher}
+                    - {first: /depot, second: /dev/data-vg/depot-1v}
