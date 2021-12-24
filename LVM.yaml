@@ -5,12 +5,12 @@
   hosts: rke2servers
   become: true
   tasks:
-          - name: task for VG
+          - name: task for creating VolumeGroup
             lvg:
                     vg: data-vg
                     pvs: "{{ partition_name }}"
 
-          - name: task for LV
+          - name: task for creating LogicalVolume
             lvol:
                     vg: data-vg
                     lv: "{{ item.first }}"
