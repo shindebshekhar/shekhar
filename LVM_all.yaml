@@ -1,4 +1,5 @@
 ---
+ #ansible-playbook lvmold.yaml --user shekhar -i hosts --limit "harbor" --extra-vars "partition_name=/dev/xvdf"
 - name: playbook
   hosts: rke2servers
   become: true
