@@ -1,5 +1,14 @@
 ---
- #ansible-playbook lvmold.yaml --user shekhar -i hosts --limit "harbor" --extra-vars "partition_name=/dev/xvdf"
+ #command - ansible-playbook lvmold.yaml --user shekhar -i hosts --limit "harbor" --extra-vars "partition_name=/dev/xvdf"
+ 
+ #vi hosts
+ #[rke2servers]
+#172.31.39.64
+#[harbor]
+#172.31.10.21
+#[Admins]
+#12.41.33.33
+
 - name: playbook
   hosts: rke2servers
   become: true
@@ -134,7 +143,7 @@
 
 
 - name: playbook
-  hosts: Admin nodes
+  hosts: admin_nodes
   become: true
   tasks:
           - name: task for VG
