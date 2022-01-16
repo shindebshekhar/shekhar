@@ -1,0 +1,213 @@
+---
+- name: playbook
+  hosts: rke2servers
+  become: true
+  tasks:
+  - name: Register a partition variable
+    shell: fdisk -l | grep '^Disk /dev/' | awk '{print $2 $3}' | grep 500
+    register: lvm_partition
+    
+  - name: Block to create partition
+    block:
+      - name: Task for creating volume group (VG)
+        lvg:
+          vg: data-vg
+          pvs: "{{ partition_name }}"  
+  
+  - name: task for LV
+    lvol:
+      vg: data-vg
+      lv: "{{ item.first }}"
+      size: "{{ item.second }}"
+    with_items:
+    - {first: rancher, second: 40G}
+    - {first: depot-1v, second: 10G}
+
+  - name: Formatting file system
+    filesystem:
+      dev: "{{item}}"
+      fstype: xfs
+    with_items:
+      - "/dev/mapper/data--vg-rancher"
+      - "/dev/mapper/data--vg-depot--1v"
+      
+  - name: Make directory
+    file:
+      path: "{{item}}"
+      state: directory
+    with_items:
+      - "/var/lib/rancher"
+      - "/depot"
+
+  - name: FSTAB entry
+    lineinfile:
+      path: /etc/fstab
+      regexp: "/var/lib/rancher"
+      line: "/dev/mapper/data--vg-rancher /var/lib/rancher xfs defaults 0 0"
+      state: present
+      backup: yes
+    register: fstab_rancher
+
+  - name: FSTAB entry
+    lineinfile:
+      path: /etc/fstab
+      regexp: "/depot"
+      line: "/dev/mapper/data--vg-depot--1v /depot xfs defaults 0 0"
+      state: present
+      backup: yes
+    register: fstab_depot
+
+
+  - name: Mount lv on rancher lib
+    mount:
+      path: "{{ item.first }}"
+      src: "{{ item.second }}"
+ fstype: xfs
+ state: mounted
+ with_items:
+ - {first: "/var/lib/rancher", second: /dev/data-vg/rancher}
+ - {first: /depot, second: /dev/data-vg/depot-1v}
+# src: /dev/data-vg/rancher-lv
+
+# with_items:
+# - 'rancher-1v'
+# - 'depot-1v'
+
+
+# path: /depot
+# src: /dev/data-vg/depot-1v
+# fstype: xfs
+# state: mounted
+
+
+- name: playbook
+ hosts: harbor
+ become: true
+ tasks:
+ - name: task for VG
+ lvg:
+ vg: data-vg
+# pvs: /dev/xvdc
+ pvs: "{{ partition_name }}"
+
+ - name: task for LV
+ lvol:
+ vg: data-vg
+# lv: rancher-lv
+ lv: "{{ item.first }}"
+ size: "{{ item.second }}"
+# size: 10g
+ with_items:
+ - {first: harbor, second: 40G}
+ - {first: depot-1v, second: 10G}
+# lvol:
+# vg: data-vg
+# lv: depot-lv
+# size: 2g
+
+###
+ - name: Formatting file system
+ shell: |
+ mkfs.xfs /dev/mapper/data--vg-harbor
+ mkfs.xfs /dev/mapper/data--vg-depot--1v
+###
+ - name: Make directory
+ file:
+ path: "{{item}}"
+ state: directory
+ with_items:
+ - "/harbor"
+ - "/depot"
+
+ - name: FSTAB entry
+ shell: echo "/dev/mapper/data--vg-rancher /harbor xfs defaults 0 0" >> /etc/fstab
+ shell: echo "/dev/mapper/data--vg-depot--1v /depot xfs defaults 0 0" >> /etc/fstab
+
+ - name: Mount lv on harbor
+ mount:
+ path: "{{ item.first }}"
+# src: /dev/data-vg/rancher-lv
+ src: "{{ item.second }}"
+ fstype: xfs
+ state: mounted
+ with_items:
+ - {first: /harbor, second: /dev/data-vg/harbor}
+ - {first: /depot, second: /dev/data-vg/depot-1v}
+# src: /dev/data-vg/rancher-lv
+
+# with_items:
+# - 'rancher-1v'
+# - 'depot-1v'
+
+
+# path: /depot
+# src: /dev/data-vg/depot-1v
+# fstype: xfs
+# state: mounted
+
+
+
+- name: playbook
+ hosts: admin_nodes
+ become: true
+ tasks:
+ - name: task for VG
+ lvg:
+ vg: data-vg
+# pvs: /dev/xvdc
+ pvs: "{{ partition_name }}"
+
+ - name: task for LV
+ lvol:
+ vg: data-vg
+# lv: rancher-lv
+ lv: "{{ item.first }}"
+ size: "{{ item.second }}"
+# size: 10g
+ with_items:
+ - {first: docker, second: 40G}
+ - {first: depot-1v, second: 10G}
+# lvol:
+# vg: data-vg
+# lv: depot-lv
+# size: 2g
+
+###
+ - name: Formatting file system
+ shell: |
+ mkfs.xfs /dev/mapper/data--vg-docker
+ mkfs.xfs /dev/mapper/data--vg-depot--1v
+###
+ - name: Make directory
+ file:
+ path: "{{item}}"
+ state: directory
+ with_items:
+ - "/var/lib/docker"
+ - "/depot"
+
+ - name: FSTAB entry
+ shell: echo "/dev/mapper/data--vg-rancher /var/lib/docker xfs defaults 0 0" >> /etc/fstab
+ shell: echo "/dev/mapper/data--vg-depot--1v /depot xfs defaults 0 0" >> /etc/fstab
+
+ - name: Mount lv on harbor
+ mount:
+ path: "{{ item.first }}"
+# src: /dev/data-vg/rancher-lv
+ src: "{{ item.second }}"
+ fstype: xfs
+ state: mounted
+ with_items:
+ - {first: "/var/lib/docker", second: /dev/data-vg/docker}
+ - {first: /depot, second: /dev/data-vg/depot-1v}
+# src: /dev/data-vg/rancher-lv
+
+# with_items:
+# - 'rancher-1v'
+# - 'depot-1v'
+
+
+# path: /depot
+# src: /dev/data-vg/depot-1v
+# fstype: xfs
+# state: mounted
